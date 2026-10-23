@@ -59,6 +59,10 @@ Alle Grafiken sind mit Compose-`Canvas` gezeichnet, es gibt keine Bilddateien. D
 
 `DemoMusicRepository` liefert 12 erfundene Platten. Die Musik (kurze Lo-Fi-Loops mit Knistern) wird beim Auflegen auf dem Gerät erzeugt und im Cache gespeichert. So gibt es keine urheberrechtlich geschützten Dateien im Repo, und die App braucht kein Netz.
 
+### Web-Prototyp
+
+`prototype/vinyl.html` ist ein klickbarer Nachbau der App für den Browser, mit denselben Maßen, Gesten und derselben Demo-Musik. Damit lassen sich Optik und Gesten schnell ausprobieren, ohne die App zu bauen. Maßgeblich bleibt die Android-App: Änderungen am Design werden in beiden nachgezogen.
+
 ### Tests
 
 ```

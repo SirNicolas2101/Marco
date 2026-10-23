@@ -1,0 +1,990 @@
+<title>Vinyl Prototyp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Roboto:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: Kopfzeile mit Ansichtsschalter, darunter die beiden Displays des Fold maßstabsgetreu nebeneinander (schmal: eines), darunter Anleitung und Zustand. */
+:root {
+  --bg: #100d0c;
+  --panel: #1b1614;
+  --line: #2f2723;
+  --fg: #f3e9da;
+  --muted: #a89a8a;
+  --brass: #d9a55b;
+  --brass-ink: #2a1c0b;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --app: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--display);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+}
+.page { display: flex; flex-direction: column; gap: 18px; max-width: 1400px; margin: 0 auto; padding-block: 16px 32px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; flex: 1 1 260px; min-width: 0; }
+.brand h1 { margin: 0; font-size: 30px; font-weight: 800; font-stretch: 125%; letter-spacing: 0.01em; }
+.brand p { margin: 0; color: var(--muted); font-size: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: inherit; }
+.seg { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 7px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--brass); color: var(--brass-ink); }
+.ghost { border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 7px 14px; cursor: pointer; font-size: 13px; }
+.ghost:hover, .seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"]:hover { color: var(--brass-ink); }
+button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.stage { display: flex; justify-content: center; align-items: flex-start; gap: 28px; min-width: 0; }
+.device { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.device[hidden] { display: none !important; }
+.device .label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); text-align: center; }
+.device .label b { color: var(--fg); font-weight: 700; }
+.frame {
+  position: relative;
+  padding: calc(10px * var(--s));
+  border-radius: calc(30px * var(--s));
+  background: #060505;
+  box-shadow: 0 0 0 1px #2a2420, 0 28px 60px rgba(0, 0, 0, 0.55);
+  transition: transform 220ms ease-in, opacity 220ms ease-in;
+}
+.frame.folding { transform: scaleX(0.04); opacity: 0.4; }
+.frame.inner::after {
+  /* Falz in der Mitte des Innendisplays */
+  content: ""; position: absolute; top: calc(10px * var(--s)); bottom: calc(10px * var(--s)); left: 50%; width: 2px; margin-left: -1px;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.05) 20%, rgba(255,255,255,0.05) 80%, transparent);
+  pointer-events: none;
+}
+.screen-wrap { width: calc(var(--w) * 1px * var(--s)); height: calc(var(--h) * 1px * var(--s)); overflow: hidden; border-radius: calc(20px * var(--s)); }
+.screen {
+  position: relative; width: calc(var(--w) * 1px); height: calc(var(--h) * 1px);
+  transform: scale(var(--s)); transform-origin: 0 0; overflow: hidden;
+  background: #141110; color: #f3e9da; font-family: var(--app);
+  user-select: none; -webkit-user-select: none;
+}
+
+/* ---------- Innendisplay ---------- */
+.lib-header { display: flex; align-items: baseline; gap: 12px; padding: 16px 24px; }
+.lib-title { flex: 1; font-size: 28px; line-height: 36px; font-weight: 700; }
+.lib-meta { font-size: 14px; font-weight: 500; color: #a89a8a; }
+.shelves { position: absolute; top: 68px; left: 0; right: 0; bottom: 0; overflow-y: auto; padding-bottom: 120px; touch-action: pan-y; scrollbar-width: none; }
+.shelves::-webkit-scrollbar { display: none; }
+.compartment { height: 286px; background: linear-gradient(to bottom, #1a110b, #3b2618, #24170e); display: flex; align-items: flex-end; gap: 3px; padding: 0 24px; }
+.board { height: 16px; background: linear-gradient(to bottom, #7a5234, #5a3a24, #2a1a10); }
+.spine { display: block; width: 38px; cursor: pointer; transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.spine.lifted { transform: translateY(-28px); }
+
+.status {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; padding: 12px 16px; max-width: calc(100% - 32px);
+  background: #2e2622; border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  transition: transform 300ms ease, opacity 300ms ease;
+}
+.status.off { transform: translate(-50%, 200%); opacity: 0; pointer-events: none; }
+.status .txt { display: flex; flex-direction: column; max-width: 380px; min-width: 0; }
+.status .t1 { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status .t2 { font-size: 12px; line-height: 16px; color: #a89a8a; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tonal { border: 0; border-radius: 999px; padding: 10px 24px; background: #4a4458; color: #e8def8; font-family: var(--app); font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+
+.overlay { position: absolute; inset: 0; }
+.overlay[hidden] { display: none !important; }
+.ov-content { position: absolute; inset: 24px; display: flex; flex-direction: column; align-items: center; }
+.sleeve-stage { position: relative; touch-action: none; cursor: grab; }
+.sleeve-stage canvas { position: absolute; left: 0; top: 0; }
+.hint { margin-top: 12px; font-size: 16px; font-weight: 500; color: #d9a55b; text-align: center; }
+.tracks { margin-top: 20px; display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.tracks .meta { font-size: 14px; font-weight: 500; color: #a89a8a; margin-bottom: 8px; }
+.tracks ol { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.tracks li { display: flex; padding: 6px 0; font-size: 16px; }
+.tracks .no { width: 40px; color: #d9a55b; font-weight: 700; }
+.tracks .ti { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tracks .du { color: #a89a8a; font-variant-numeric: tabular-nums; }
+
+/* ---------- Außendisplay ---------- */
+#cover { touch-action: none; }
+#cover canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+.info { position: absolute; left: 0; right: 0; padding: 16px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none; }
+.info .h { font-size: 22px; line-height: 28px; font-weight: 700; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.info .d { margin-top: 4px; font-size: 14px; line-height: 20px; color: #a89a8a; font-variant-numeric: tabular-nums; }
+
+/* ---------- Anleitung & Zustand ---------- */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; min-width: 0; }
+.card h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.card ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5; }
+.state { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 14px; margin: 0; }
+.state dt { color: var(--muted); }
+.state dd { margin: 0; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+.fine { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
+@media (prefers-reduced-motion: reduce) {
+  .frame, .spine, .status { transition: none; }
+}
+</style>
+
+<div class="page">
+  <header>
+    <div class="brand">
+      <h1>Vinyl</h1>
+      <p>Klickbarer Nachbau der Fold-App mit Demo-Platten. Ton an, dann Nadel auflegen.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Ansicht">
+        <button id="vBoth" aria-pressed="false">Beide</button>
+        <button id="vInner" aria-pressed="false">Aufgeklappt</button>
+        <button id="vCover" aria-pressed="false">Zugeklappt</button>
+      </div>
+      <button class="ghost" id="reset">Zurücksetzen</button>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="device" id="devInner">
+      <div class="frame inner"><div class="screen-wrap" style="--w:720;--h:820">
+        <div class="screen" id="inner" style="--w:720;--h:820">
+          <div class="lib-header"><div class="lib-title">Plattenschrank</div><div class="lib-meta" id="libMeta"></div></div>
+          <div class="shelves" id="shelves"></div>
+          <div class="status off" id="status">
+            <canvas id="statusRec" width="48" height="48" style="width:48px;height:48px"></canvas>
+            <div class="txt"><div class="t1" id="st1"></div><div class="t2" id="st2"></div></div>
+            <button class="tonal" id="liftBtn" hidden>Nadel heben</button>
+          </div>
+          <div class="overlay" id="overlay" hidden>
+            <div class="ov-content" id="ovContent">
+              <div class="sleeve-stage" id="sleeveStage"><canvas id="ovRecord"></canvas><canvas id="ovCover"></canvas></div>
+              <div class="hint" id="hint"></div>
+              <div class="tracks" id="tracks"><div class="meta" id="trMeta"></div><ol id="trList"></ol></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="label"><b>Innendisplay</b> · aufgeklappt · 720 × 820 dp</div>
+    </div>
+
+    <div class="device" id="devCover">
+      <div class="frame"><div class="screen-wrap" style="--w:400;--h:900">
+        <div class="screen" id="cover" style="--w:400;--h:900">
+          <canvas id="deckCanvas"></canvas>
+          <div class="info" id="info"><div class="h" id="infoH"></div><div class="d" id="infoD"></div></div>
+          <canvas id="topCanvas"></canvas>
+        </div>
+      </div></div>
+      <div class="label"><b>Außendisplay</b> · zugeklappt · 400 × 900 dp</div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <section class="card">
+      <h2>So geht's</h2>
+      <ol>
+        <li>Innen eine Platte im Schrank antippen.</li>
+        <li>Die Platte nach rechts aus der Hülle ziehen.</li>
+        <li>Die Platte nach oben wischen: Sie liegt jetzt vorne bereit.</li>
+        <li>Außen die Platte auf den Plattenteller ziehen oder antippen.</li>
+        <li>Den Tonarm über die Platte schwenken und loslassen. Wo die Nadel aufsetzt, bestimmt den Titel.</li>
+        <li>Zum Stoppen den Tonarm zurück auf die Stütze legen. Bei abgelegtem Arm lässt sich die Platte vom Teller ziehen.</li>
+      </ol>
+    </section>
+    <section class="card">
+      <h2>Zustand</h2>
+      <dl class="state">
+        <dt>Vorne wartet</dt><dd id="sPending">–</dd>
+        <dt>Plattenteller</dt><dd id="sPlatter">–</dd>
+        <dt>Nadel</dt><dd id="sNeedle">oben</dd>
+        <dt>Titel</dt><dd id="sTrack">–</dd>
+        <dt>Drehzahl</dt><dd id="sRpm">0 U/min</dd>
+      </dl>
+      <p class="fine">Nachbau des App-Codes im Browser: gleiche Maße, Gesten und Demo-Musik. Maßgeblich bleibt die Android-App, kleine Abweichungen sind möglich.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const rad = d => d * Math.PI / 180;
+const deg = r => r * 180 / Math.PI;
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const $ = id => document.getElementById(id);
+const DENSITY = 2.625;       // Fold-Innendisplay ≈ 420 dpi; App-Schwellen sind in px angegeben
+const SLOP = 8;              // Touch-Slop in dp
+
+// ---------- Demo-Daten (wie DemoMusicRepository) ----------
+function jHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; return h; }
+function demo(title, artist, year, primary, secondary, pattern, ...tracks) {
+  const id = 'demo-' + title.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  return {
+    id, title, artist, year, primary, secondary, pattern,
+    tracks: tracks.map((name, i) => ({ id: `${id}-${i}`, title: name, durationMs: 32000 + ((jHash(name) & 0x7FFF) % 18) * 1000 })),
+  };
+}
+const ALBUMS = [
+  demo('Mitternachtsfahrt', 'Die Nachtfalter', 1979, '#1B2A4A', '#E8B04B', 'Sunburst', 'Auffahrt', 'Tankstelle 3 Uhr', 'Rücklichter', 'Heimweg'),
+  demo('Salt & Static', 'Harbor Lights', 1984, '#2F6F73', '#F2E3C6', 'Waves', 'Low Tide', 'Lighthouse Hum', 'Fog Signal', 'Driftwood', 'Last Ferry'),
+  demo('Blauer Montag', 'Kassettendeck', 1991, '#2D4FA3', '#F5F1E8', 'Stripes', 'Wecker aus', 'Kaffee schwarz', 'Bürofenster', 'Feierabend'),
+  demo('Neon Orchard', 'Velvet Tram', 1986, '#3A1F4F', '#FF6FA8', 'Grid', 'Pink Harvest', 'Arcade Bloom', 'Chrome Petals', 'Night Shift'),
+  demo('Wolken über Wedding', 'Frau Schneider', 1997, '#B9B4A8', '#3C3A36', 'Circles', 'Hinterhof', 'Ringbahn', 'Späti', 'Nieselregen', 'Balkonien'),
+  demo('Low Tide Radio', 'The Lanterns', 1973, '#C4572E', '#F4D9A6', 'Sunburst', 'Station Identification', 'Sandbar', 'Static Love', 'Sign Off'),
+  demo('Kupfer', 'Ostwind Trio', 1968, '#8C4A2F', '#E9C79A', 'Circles', 'Patina', 'Glut', 'Draht', 'Grünspan'),
+  demo('Slow Motion Summer', 'Polaroid Club', 2003, '#F2C14E', '#2B6F8E', 'Waves', 'Sunscreen', 'Pool Ladder', 'Instant Film', 'Late August', 'Goodbye Tan'),
+  demo('Analog Herz', 'Röhrenradio', 1982, '#9E1B32', '#F0E6D2', 'Grid', 'Aufwärmen', 'Mittelwelle', 'Rauschen', 'Senderwechsel'),
+  demo('Glasshouse Sessions', 'Glasshouse Ensemble', 2011, '#4F7F52', '#E4F0D0', 'Stripes', 'Morning Mist', 'Fern', 'Condensation', 'Greenhouse Glow'),
+  demo('Sonntagsdienst', 'Die Plattenwechsler', 1988, '#5B5F97', '#FFC145', 'Circles', 'Frühschicht', 'Kantine', 'Pause', 'Übergabe', 'Dienstschluss'),
+  demo('Northern Drift', 'Aurora Unit', 2019, '#0F3D3E', '#7FFFD4', 'Sunburst', 'Polar Night', 'Ice Road', 'Green Veil', 'Thaw'),
+];
+const byId = id => ALBUMS.find(a => a.id === id) || null;
+
+// ---------- Rille ↔ Titel (wie GrooveMap) ----------
+class GrooveMap {
+  constructor(durs) {
+    this.d = (durs.length ? durs : [180000]).map(x => x > 0 ? x : 180000);
+    this.starts = []; let s = 0;
+    for (const x of this.d) { this.starts.push(s); s += x; }
+    this.total = s;
+    this.boundaries = this.starts.slice(1).map(v => v / this.total);
+  }
+  locate(p) {
+    const t = clamp(Math.floor(clamp(p, 0, 1) * this.total), 0, this.total - 1);
+    let i = 0; this.starts.forEach((s, k) => { if (s <= t) i = k; });
+    let pos = t - this.starts[i];
+    if (pos < 1500) pos = 0;
+    else if (this.d[i] - pos < 1000 && i < this.d.length - 1) { i++; pos = 0; }
+    return { i, pos };
+  }
+  progressOf(i, pos) {
+    i = clamp(i, 0, this.d.length - 1);
+    return clamp((this.starts[i] + clamp(pos, 0, this.d[i])) / this.total, 0, 1);
+  }
+}
+const grooveCache = new Map();
+const grooveOf = a => { if (!grooveCache.has(a.id)) grooveCache.set(a.id, new GrooveMap(a.tracks.map(t => t.durationMs))); return grooveCache.get(a.id); };
+
+// ---------- Geometrie (wie TurntableGeometry / VinylSpec) ----------
+const SPEC = { OUTER: 0.945, INNER: 0.425, LABEL: 0.33, SPINDLE: 0.028 };
+const grooveRadius = (r, p) => r * (SPEC.OUTER - clamp(p, 0, 1) * (SPEC.OUTER - SPEC.INNER));
+class Geometry {
+  constructor(w) {
+    this.w = w; this.h = w * 0.96;
+    this.pc = { x: 0.42 * w, y: 0.5 * w }; this.pr = 0.38 * w; this.rr = 0.365 * w;
+    this.outerR = this.rr * SPEC.OUTER; this.innerR = this.rr * SPEC.INNER;
+    this.pivot = { x: 0.86 * w, y: 0.12 * w }; this.L = 0.62 * w; this.rest = 90;
+    this.outerA = this.angleForRadius(this.outerR);
+    this.innerA = this.angleForRadius(this.innerR);
+    this.maxA = this.innerA + 1.5;
+  }
+  needleAt(a) { return { x: this.pivot.x + Math.cos(rad(a)) * this.L, y: this.pivot.y + Math.sin(rad(a)) * this.L }; }
+  needleRadius(a) { return dist(this.needleAt(a), this.pc); }
+  clampA(a) { return clamp(a, this.rest, this.maxA); }
+  angleTowards(p) { return deg(Math.atan2(p.y - this.pivot.y, p.x - this.pivot.x)); }
+  over(a) { return a >= this.outerA; }
+  progressForAngle(a) { return clamp((this.outerR - this.needleRadius(a)) / (this.outerR - this.innerR), 0, 1); }
+  angleForProgress(p) { return this.angleForRadius(grooveRadius(this.rr, p)); }
+  distToArm(p, a) {
+    const A = this.pivot, B = this.needleAt(a), ab = { x: B.x - A.x, y: B.y - A.y };
+    const t = clamp(((p.x - A.x) * ab.x + (p.y - A.y) * ab.y) / (ab.x * ab.x + ab.y * ab.y), 0, 1);
+    return Math.hypot(p.x - (A.x + ab.x * t), p.y - (A.y + ab.y * t));
+  }
+  angleForRadius(r) {
+    let lo = this.rest, hi = this.angleTowards(this.pc);
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (this.needleRadius(m) > r) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
+}
+
+// ---------- Animationen (Federn wie Compose spring, Tween) ----------
+const anims = new Set();
+const ease = p => p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+class Anim {
+  constructor(v, eps = 0.3) { this.v = v; this.vel = 0; this.mode = null; this.eps = eps; anims.add(this); }
+  _finish(ok) { const r = this._res; this._res = null; if (r) r(ok); }
+  snap(v) { this.mode = null; this.v = v; this.vel = 0; this._finish(false); }
+  spring(t, z = 1, k = 1500) { this._finish(false); this.mode = 's'; this.t = t; this.z = z; this.k = k; return new Promise(r => { this._res = r; }); }
+  tween(t, ms) { this._finish(false); this.mode = 't'; this.from = this.v; this.t = t; this.dur = ms / 1000; this.el = 0; return new Promise(r => { this._res = r; }); }
+  step(dt) {
+    if (this.mode === 's') {
+      let rem = dt; const w = Math.sqrt(this.k);
+      while (rem > 0) { const h = Math.min(rem, 1 / 240); const a = -this.k * (this.v - this.t) - 2 * this.z * w * this.vel; this.vel += a * h; this.v += this.vel * h; rem -= h; }
+      if (Math.abs(this.v - this.t) < this.eps && Math.abs(this.vel) < this.eps * 10) { this.v = this.t; this.vel = 0; this.mode = null; this._finish(true); }
+    } else if (this.mode === 't') {
+      this.el += dt; const p = Math.min(1, this.el / this.dur);
+      this.v = this.from + (this.t - this.from) * ease(p);
+      if (p >= 1) { this.mode = null; this._finish(true); }
+    }
+  }
+}
+
+// ---------- Demo-Musik (wie DemoAudioSynth) ----------
+const SR = 22050;
+const PROG = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]];
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+const nextFrame = () => new Promise(r => setTimeout(r, 0));
+async function renderTrack(seed, ms) {
+  const rnd = mulberry32(seed);
+  const root = 45 + Math.floor(rnd() * 10), bpm = 72 + Math.floor(rnd() * 36);
+  const arp = Array.from({ length: 8 }, () => Math.floor(rnd() * 3));
+  const oct = Array.from({ length: 8 }, () => rnd() < 0.35 ? 12 : 0);
+  const n = Math.floor(ms * SR / 1000), out = new Float32Array(n);
+  const beat = Math.floor(SR * 60 / bpm), eighth = Math.floor(beat / 2), bar = beat * 4, fade = SR * 2;
+  const cr = mulberry32(seed ^ 0x5EED);
+  const padHz = PROG.map(c => c.map(iv => hz(root + 12 + iv)));
+  const arpHz = PROG.map(c => arp.map((a, s) => hz(root + 24 + c[a] + oct[s])));
+  const TAU = Math.PI * 2;
+  for (let i = 0; i < n; i++) {
+    const t = i / SR, ci = Math.floor(i / bar) % 4, ph = padHz[ci];
+    const pad = (Math.sin(TAU * ph[0] * t) + Math.sin(TAU * ph[1] * t) + Math.sin(TAU * ph[2] * t)) * 0.07;
+    const step = Math.floor(i / eighth) % 8, sn = (i % eighth) / SR;
+    const ar = Math.sin(TAU * arpHz[ci][step] * sn) * Math.exp(-sn * 6) * 0.16;
+    const sb = (i % beat) / SR, kh = 50 + 90 * Math.exp(-sb * 30);
+    const kick = Math.sin(TAU * kh * sb) * Math.exp(-sb * 9) * 0.32;
+    const noise = (cr() - 0.5) * 0.012 + (Math.floor(cr() * 2500) === 0 ? (cr() - 0.5) * 0.5 : 0);
+    const env = Math.min(1, i / fade, (n - i) / fade);
+    out[i] = clamp((pad + ar + kick) * env + noise, -1, 1);
+    if (i % 150000 === 149999) await nextFrame();
+  }
+  return out;
+}
+const bufferCache = new Map();
+async function trackBuffer(track) {
+  if (bufferCache.has(track.id)) return bufferCache.get(track.id);
+  const data = await renderTrack(jHash(track.id), track.durationMs);
+  let buf;
+  try { buf = new AudioBuffer({ length: data.length, sampleRate: SR, numberOfChannels: 1 }); }
+  catch (e) { player.ensure(); buf = player.ctx.createBuffer(1, data.length, SR); }
+  buf.copyToChannel(data, 0);
+  bufferCache.set(track.id, buf);
+  return buf;
+}
+async function resolveStreams(album) { const out = []; for (const t of album.tracks) out.push(await trackBuffer(t)); return out; }
+
+// ---------- Player (wie PlayerController) ----------
+const player = {
+  ctx: null, gain: null, albumId: null, bufs: null, i: 0, offset: 0, t0: 0, playing: false, src: null,
+  ensure() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      this.ctx = new AC(); this.gain = this.ctx.createGain(); this.gain.gain.value = 0.9; this.gain.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  load(id, bufs) { if (id === this.albumId) return; this.stop(); this.albumId = id; this.bufs = bufs; },
+  playFrom(i, ms) {
+    this.ensure(); if (!this.ctx || !this.bufs) return;
+    this._kill(); this.i = i; this.offset = ms / 1000;
+    const src = this.ctx.createBufferSource(); src.buffer = this.bufs[i]; src.connect(this.gain);
+    src.onended = () => {
+      if (this.src !== src) return;
+      this.src = null;
+      if (this.i + 1 < this.bufs.length) this.playFrom(this.i + 1, 0);
+      else { this.playing = false; this.offset = this.bufs[this.i].duration; onEndOfRecord(this.albumId); }
+    };
+    this.t0 = this.ctx.currentTime; src.start(0, this.offset); this.src = src; this.playing = true;
+  },
+  _kill() { if (this.src) { const s = this.src; this.src = null; try { s.stop(); } catch (e) { /* schon gestoppt */ } } },
+  pause() { if (this.playing) this.offset = this.posMs() / 1000; this._kill(); this.playing = false; },
+  stop() { this._kill(); this.playing = false; this.albumId = null; this.bufs = null; this.i = 0; this.offset = 0; },
+  posMs() { return this.playing ? (this.offset + this.ctx.currentTime - this.t0) * 1000 : this.offset * 1000; },
+};
+document.addEventListener('pointerdown', () => player.ensure(), { capture: true });
+
+// ---------- Zustand (wie VinylViewModel) ----------
+const deck = { selectedId: null, pending: null, platter: null, needleDown: false, dropProgress: 0, error: null };
+let streams = null, dropToken = 0;
+function sendToFront(a) { deck.pending = a; }
+function placePending() {
+  const rec = deck.pending; if (!rec) return;
+  dropToken++; player.stop();
+  streams = resolveStreams(rec); streams.catch(() => {});
+  Object.assign(deck, { platter: rec, pending: null, needleDown: false, dropProgress: 0, error: null });
+}
+function removeFromPlatter() { dropToken++; player.stop(); streams = null; deck.platter = null; deck.needleDown = false; }
+function dropNeedle(p) {
+  const rec = deck.platter, pending = streams; if (!rec || !pending) return;
+  const pos = grooveOf(rec).locate(p);
+  deck.needleDown = true; deck.dropProgress = p;
+  const token = ++dropToken;
+  pending.then(bufs => {
+    if (token !== dropToken || deck.platter !== rec || !deck.needleDown) return;
+    player.load(rec.id, bufs); player.playFrom(pos.i, pos.pos);
+  }).catch(e => { deck.needleDown = false; deck.error = 'Platte konnte nicht geladen werden'; });
+}
+function liftNeedle() { dropToken++; player.pause(); deck.needleDown = false; }
+function onEndOfRecord(id) { if (deck.platter && deck.platter.id === id) deck.needleDown = false; }
+function needleProgress() {
+  const rec = deck.platter; if (!rec || !deck.needleDown) return null;
+  if (player.albumId === rec.id && player.playing) return grooveOf(rec).progressOf(player.i, player.posMs());
+  return deck.dropProgress;
+}
+
+// ---------- Zeichnen ----------
+const VINYL_BLACK = '#0E0E0F', STEEL = '#C9CDD2', STEEL_DARK = '#7D838A', BRASS = '#D9A55B';
+const FONT = '"Roboto", system-ui, sans-serif';
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function circle(ctx, x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(0, r), 0, Math.PI * 2); }
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function ellipsize(ctx, s, maxW) {
+  if (ctx.measureText(s).width <= maxW) return s;
+  while (s.length && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+  return s.trimEnd() + '…';
+}
+function wrap(ctx, text, maxW, maxLines) {
+  const words = text.split(' '), lines = []; let cur = '';
+  for (const w of words) { const test = cur ? cur + ' ' + w : w; if (!cur || ctx.measureText(test).width <= maxW) cur = test; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur);
+  if (lines.length > maxLines) { const rest = lines.slice(maxLines - 1).join(' '); lines.length = maxLines - 1; lines.push(ellipsize(ctx, rest + '…', maxW)); }
+  return lines.map(l => ellipsize(ctx, l, maxW));
+}
+function setupCanvas(cv, w, h, ps) {
+  cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  cv.width = Math.round(w * ps); cv.height = Math.round(h * ps);
+  const ctx = cv.getContext('2d'); ctx.setTransform(ps, 0, 0, ps, 0, 0); return ctx;
+}
+
+// Platte: statischer Teil (Rillen, Lücken, Reflex) und Label werden zwischengespeichert, nur das Label dreht sich.
+const vinylCache = new Map();
+function vinylParts(album, r, ps) {
+  const key = `${album.id}|${r.toFixed(1)}|${ps.toFixed(2)}`;
+  if (vinylCache.has(key)) return vinylCache.get(key);
+  const disc = document.createElement('canvas');
+  const c = setupCanvas(disc, 2 * r, 2 * r, ps);
+  c.translate(r, r);
+  c.fillStyle = VINYL_BLACK; circle(c, 0, 0, r); c.fill();
+  const outer = r * SPEC.OUTER, inner = r * SPEC.INNER, step = Math.max(r * 0.012, 1.6);
+  c.lineWidth = step * 0.35;
+  for (let gr = inner, i = 0; gr < outer; gr += step, i++) { c.strokeStyle = `rgba(255,255,255,${i % 3 === 0 ? 0.07 : 0.035})`; circle(c, 0, 0, gr); c.stroke(); }
+  c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = r * 0.012; circle(c, 0, 0, r * 0.985); c.stroke();
+  c.strokeStyle = '#2C2C2E'; c.lineWidth = Math.max(r * 0.012, 2);
+  for (const b of grooveOf(album).boundaries) { circle(c, 0, 0, grooveRadius(r, b)); c.stroke(); }
+  if (c.createConicGradient) {
+    const g = c.createConicGradient(0, 0, 0);
+    [[0, 0], [0.10, 0.10], [0.18, 0], [0.50, 0], [0.60, 0.08], [0.68, 0], [1, 0]].forEach(([o, a]) => g.addColorStop(o, `rgba(255,255,255,${a})`));
+    c.fillStyle = g; circle(c, 0, 0, r * 0.99); c.fill();
+  }
+
+  const L = r * SPEC.LABEL, label = document.createElement('canvas');
+  const l = setupCanvas(label, 2 * L, 2 * L, ps);
+  l.translate(L, L);
+  const fill = album.secondary, accent = album.primary;
+  l.fillStyle = fill; circle(l, 0, 0, L); l.fill();
+  l.strokeStyle = accent; l.lineWidth = L * 0.035; circle(l, 0, 0, L * 0.93); l.stroke();
+  l.fillStyle = hexA(accent, 0.18); circle(l, 0, 0, L * 0.42); l.fill();
+  l.textAlign = 'center'; l.textBaseline = 'top';
+  const maxW = L * 1.35;
+  let fs = L * 0.17; l.font = `700 ${fs}px ${FONT}`; l.fillStyle = accent;
+  const tl = wrap(l, album.title.toUpperCase(), maxW, 2), lh = fs * 1.17;
+  tl.forEach((s, i) => l.fillText(s, 0, -L * 0.52 - tl.length * lh / 2 + i * lh));
+  fs = L * 0.13; l.font = `400 ${fs}px ${FONT}`; l.fillStyle = hexA(accent, 0.85);
+  l.fillText(ellipsize(l, album.artist, maxW), 0, L * 0.55 - fs * 1.17 / 2);
+  fs = L * 0.1; l.font = `400 ${fs}px ${FONT}`; l.fillStyle = hexA(accent, 0.7); l.textAlign = 'left';
+  l.fillText('A  ·  33⅓', L * 0.18, -fs * 1.17 / 2);
+
+  const parts = { disc, label, L };
+  vinylCache.set(key, parts);
+  return parts;
+}
+function drawVinyl(ctx, album, cx, cy, r, rot, shadow, ps) {
+  if (shadow) { ctx.fillStyle = 'rgba(0,0,0,0.45)'; circle(ctx, cx + r * 0.02, cy + r * 0.04, r * 1.02); ctx.fill(); }
+  const p = vinylParts(album, r, ps);
+  ctx.drawImage(p.disc, cx - r, cy - r, 2 * r, 2 * r);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rad(rot)); ctx.drawImage(p.label, -p.L, -p.L, 2 * p.L, 2 * p.L); ctx.restore();
+  ctx.fillStyle = '#0A0A0A'; circle(ctx, cx, cy, r * SPEC.SPINDLE); ctx.fill();
+}
+
+function drawPattern(c, pattern, color, w, h) {
+  if (pattern === 'Circles') {
+    c.lineWidth = w * 0.018;
+    for (let i = 6; i >= 1; i--) { c.strokeStyle = hexA(color, 0.12 + 0.1 * (6 - i)); circle(c, w * 0.62, h * 0.38, w * 0.08 * i); c.stroke(); }
+    c.fillStyle = color; circle(c, w * 0.62, h * 0.38, w * 0.07); c.fill();
+  } else if (pattern === 'Stripes') {
+    for (let i = 0; i < 9; i++) { c.fillStyle = hexA(color, Math.min(1, 0.25 + 0.08 * i)); c.fillRect(0, h * (0.06 + i * 0.065), w, h * 0.03); }
+  } else if (pattern === 'Grid') {
+    const n = 7, cell = w / n;
+    for (let x = 0; x < n; x++) for (let y = 0; y < 4; y++) {
+      if ((x * 3 + y * 5) % 4 === 0) continue;
+      c.fillStyle = hexA(color, 0.18 + 0.12 * ((x + y) % 4));
+      rrect(c, x * cell + cell * 0.12, y * cell + cell * 0.12, cell * 0.76, cell * 0.76, cell * 0.12); c.fill();
+    }
+  } else if (pattern === 'Sunburst') {
+    const ox = w * 0.5, oy = h * 0.55, rays = 18;
+    c.fillStyle = hexA(color, 0.35);
+    for (let i = 0; i < rays; i += 2) {
+      const a0 = Math.PI * i / rays, a1 = Math.PI * (i + 1) / rays;
+      c.beginPath(); c.moveTo(ox, oy);
+      c.lineTo(ox + Math.cos(a0) * w * 1.2, oy - Math.sin(a0) * w * 1.2);
+      c.lineTo(ox + Math.cos(a1) * w * 1.2, oy - Math.sin(a1) * w * 1.2); c.closePath(); c.fill();
+    }
+    c.fillStyle = color; circle(c, ox, oy, w * 0.16); c.fill();
+  } else if (pattern === 'Waves') {
+    c.lineWidth = w * 0.012;
+    for (let row = 0; row < 8; row++) {
+      const baseY = h * (0.08 + row * 0.07);
+      c.strokeStyle = hexA(color, Math.min(1, 0.3 + 0.08 * row)); c.beginPath(); c.moveTo(0, baseY);
+      for (let x = 0; x <= w; x += w / 60) c.lineTo(x, baseY + Math.sin(x / w * 4 * Math.PI + row) * h * 0.02);
+      c.stroke();
+    }
+  }
+}
+function drawCover(cv, album, size, ps) {
+  const c = setupCanvas(cv, size, size, ps);
+  c.fillStyle = album.primary; c.fillRect(0, 0, size, size);
+  c.save(); c.beginPath(); c.rect(0, 0, size, size); c.clip(); drawPattern(c, album.pattern, album.secondary, size, size); c.restore();
+  const g = c.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.28)');
+  c.fillStyle = g; c.fillRect(0, 0, size, size);
+  const pad = size * 0.07, maxW = size - 2 * pad;
+  c.textBaseline = 'top'; c.textAlign = 'left';
+  let fs = size * 0.04; c.font = `500 ${fs}px ${FONT}`; c.fillStyle = hexA(album.secondary, 0.85);
+  const artistH = fs * 1.17;
+  c.fillText(ellipsize(c, album.artist.toUpperCase() + (album.year ? `  ·  ${album.year}` : ''), maxW), pad, size - pad - artistH);
+  fs = size * 0.085; c.font = `900 ${fs}px ${FONT}`; c.fillStyle = album.secondary;
+  const lines = wrap(c, album.title, maxW, 2), lh = fs * 1.17, top = size - pad - artistH - lines.length * lh - size * 0.01;
+  lines.forEach((s, i) => c.fillText(s, pad, top + i * lh));
+}
+function drawSpine(cv, album, w, h, dimmed, ps) {
+  const c = setupCanvas(cv, w, h, ps);
+  c.fillStyle = album.primary; rrect(c, 0, 0, w, h, w * 0.12); c.fill();
+  c.fillStyle = album.secondary; c.fillRect(0, h * 0.06, w, h * 0.012); c.fillRect(0, h * 0.93, w, h * 0.012);
+  c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(0, 0, w * 0.12, h);
+  c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(w * 0.86, 0, w * 0.14, h);
+  c.save(); c.translate(w / 2, h / 2); c.rotate(-Math.PI / 2);
+  c.font = `700 ${w * 0.36}px ${FONT}`; c.fillStyle = album.secondary; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(ellipsize(c, `${album.artist.toUpperCase()}  —  ${album.title}`, h * 0.8), 0, 0);
+  c.restore();
+  if (dimmed) { c.fillStyle = 'rgba(0,0,0,0.55)'; rrect(c, 0, 0, w, h, w * 0.12); c.fill(); }
+}
+
+function drawPlinth(c, g, motorOn) {
+  const w = g.w, h = g.h;
+  const grad = c.createLinearGradient(0, 0, w, h);
+  grad.addColorStop(0, '#7A5234'); grad.addColorStop(0.5, '#5A3A24'); grad.addColorStop(1, '#3B2618');
+  c.fillStyle = grad; rrect(c, 0, 0, w, h, w * 0.04); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,0.06)'; c.lineWidth = w * 0.004;
+  for (let i = 0; i < 14; i++) { const y = h * (i + 0.5) / 14; c.beginPath(); c.moveTo(0, y); c.lineTo(w, y + w * 0.03 * Math.sin(i * 1.7)); c.stroke(); }
+  c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = w * 0.006; rrect(c, 0, 0, w, h, w * 0.04); c.stroke();
+  const kx = w * 0.86, ky = h * 0.9;
+  c.fillStyle = 'rgba(0,0,0,0.4)'; circle(c, kx + w * 0.004, ky + w * 0.008, w * 0.042); c.fill();
+  const kg = c.createRadialGradient(kx, ky, 0, kx, ky, w * 0.04); kg.addColorStop(0, STEEL); kg.addColorStop(1, STEEL_DARK);
+  c.fillStyle = kg; circle(c, kx, ky, w * 0.038); c.fill();
+  const lx = w * 0.76;
+  c.fillStyle = motorOn ? '#FF5A3C' : '#4A1A12'; circle(c, lx, ky, w * 0.011); c.fill();
+  if (motorOn) { c.fillStyle = 'rgba(255,90,60,0.33)'; circle(c, lx, ky, w * 0.025); c.fill(); }
+}
+function drawPlatter(c, g, rot) {
+  const { x, y } = g.pc, r = g.pr;
+  c.fillStyle = 'rgba(0,0,0,0.45)'; circle(c, x + r * 0.02, y + r * 0.04, r * 1.01); c.fill();
+  const pg = c.createRadialGradient(x, y, 0, x, y, r); pg.addColorStop(0, '#9EA3A8'); pg.addColorStop(1, '#5D6166');
+  c.fillStyle = pg; circle(c, x, y, r); c.fill();
+  c.fillStyle = '#2B2E31';
+  for (let i = 0; i < 90; i++) { const a = rad(i * 4 + rot); circle(c, x + Math.cos(a) * r * 0.985, y + Math.sin(a) * r * 0.985, r * 0.008); c.fill(); }
+  c.fillStyle = '#1C1C1E'; circle(c, x, y, r * 0.965); c.fill();
+  c.fillStyle = STEEL; circle(c, x, y, r * 0.03); c.fill();
+}
+function armShape(c, g, shadowOnly) {
+  const w = g.w, sh = 'rgba(0,0,0,0.32)';
+  const stylus = w * 0.069, ha = rad(22);
+  const te = { x: stylus * Math.sin(ha), y: g.L - stylus * Math.cos(ha) };
+  c.fillStyle = shadowOnly ? sh : '#2F3236';
+  rrect(c, -w * 0.034, -w * 0.11 - w * 0.03, w * 0.068, w * 0.06, w * 0.01); c.fill();
+  c.strokeStyle = shadowOnly ? sh : STEEL; c.lineWidth = w * 0.016; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(0, -w * 0.08); c.lineTo(te.x, te.y); c.stroke();
+  if (!shadowOnly) { c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = w * 0.004; c.lineCap = 'butt'; c.beginPath(); c.moveTo(-w * 0.003, 0); c.lineTo(te.x - w * 0.003, te.y); c.stroke(); }
+  c.save(); c.translate(te.x, te.y); c.rotate(ha);
+  c.fillStyle = shadowOnly ? sh : '#1F2124'; rrect(c, -w * 0.024, -w * 0.004, w * 0.048, w * 0.085, w * 0.008); c.fill();
+  if (!shadowOnly) {
+    c.strokeStyle = STEEL; c.lineWidth = w * 0.006; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(w * 0.02, w * 0.015); c.lineTo(w * 0.05, w * 0.01); c.stroke();
+    c.fillStyle = BRASS; c.fillRect(-w * 0.012, stylus - w * 0.018, w * 0.024, w * 0.018);
+  }
+  c.restore();
+}
+function drawTonearm(c, g, angle, lifted) {
+  const w = g.w, P = g.pivot;
+  c.fillStyle = 'rgba(0,0,0,0.35)'; circle(c, P.x + w * 0.006, P.y + w * 0.01, w * 0.075); c.fill();
+  const bg = c.createRadialGradient(P.x, P.y, 0, P.x, P.y, w * 0.075); bg.addColorStop(0, '#3A3D41'); bg.addColorStop(1, '#1E2022');
+  c.fillStyle = bg; circle(c, P.x, P.y, w * 0.072); c.fill();
+  const n = g.needleAt(g.rest), rx = P.x + (n.x - P.x) * 0.62, ry = P.y + (n.y - P.y) * 0.62;
+  c.fillStyle = '#2A2C2F'; rrect(c, rx + w * 0.012, ry - w * 0.02, w * 0.03, w * 0.04, w * 0.006); c.fill();
+  const so = lifted ? { x: w * 0.028, y: w * 0.036 } : { x: w * 0.006, y: w * 0.009 };
+  c.save(); c.translate(P.x + so.x, P.y + so.y); c.rotate(rad(angle - 90)); armShape(c, g, true); c.restore();
+  c.save(); c.translate(P.x, P.y); c.rotate(rad(angle - 90)); armShape(c, g, false); c.restore();
+  const cg = c.createRadialGradient(P.x, P.y, 0, P.x, P.y, w * 0.035); cg.addColorStop(0, STEEL); cg.addColorStop(1, STEEL_DARK);
+  c.fillStyle = cg; circle(c, P.x, P.y, w * 0.032); c.fill();
+}
+
+// ---------- Darstellung, Skalierung ----------
+const scale = { inner: 1, cover: 1 };
+const dpr = () => Math.max(1, window.devicePixelRatio || 1);
+const pxInner = () => scale.inner * dpr();
+const pxCover = () => scale.cover * dpr();
+function localPoint(el, e, w) { const r = el.getBoundingClientRect(), k = r.width / w; return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k }; }
+function velocityOf(samples) {
+  const now = samples[samples.length - 1]; let i = samples.length - 1;
+  while (i > 0 && now.t - samples[i - 1].t < 100) i--;
+  const first = samples[i], dt = (now.t - first.t) / 1000;
+  return dt > 0 ? { x: (now.x - first.x) / dt, y: (now.y - first.y) / dt } : { x: 0, y: 0 };
+}
+
+// ---------- Innendisplay: Schrank ----------
+const INNER_W = 720, INNER_H = 820;
+const shelvesEl = $('shelves');
+let spineEls = [];
+function buildShelves() {
+  shelvesEl.textContent = '';
+  spineEls = [];
+  const perShelf = Math.max(1, Math.floor((INNER_W - 48 + 3) / (38 + 3)));
+  const chunks = [];
+  for (let i = 0; i < ALBUMS.length; i += perShelf) chunks.push(ALBUMS.slice(i, i + perShelf));
+  while (chunks.length < 3) chunks.push([]);
+  for (const chunk of chunks) {
+    const comp = document.createElement('div'); comp.className = 'compartment';
+    chunk.forEach((album, i) => {
+      const cv = document.createElement('canvas');
+      cv.className = 'spine'; cv.setAttribute('role', 'button'); cv.tabIndex = 0;
+      cv.setAttribute('aria-label', `${album.title} von ${album.artist}`);
+      cv.dataset.id = album.id; cv.dataset.h = 250 - ((i * 7) % 4) * 3;
+      cv.addEventListener('click', () => select(album));
+      cv.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(album); } });
+      comp.appendChild(cv); spineEls.push(cv);
+    });
+    const board = document.createElement('div'); board.className = 'board';
+    shelvesEl.append(comp, board);
+  }
+  paintSpines();
+}
+let spineSig = '';
+function paintSpines(force = true) {
+  const away = new Set([deck.pending && deck.pending.id, deck.platter && deck.platter.id]);
+  const sig = [...away].join() + '|' + pxInner();
+  if (!force && sig === spineSig) return;
+  spineSig = sig;
+  for (const cv of spineEls) {
+    const a = byId(cv.dataset.id);
+    drawSpine(cv, a, 38, +cv.dataset.h, away.has(a.id), pxInner());
+    cv.classList.toggle('lifted', a.id === deck.selectedId);
+  }
+}
+
+// ---------- Innendisplay: Hülle (wie SleeveDetail) ----------
+const overlay = $('overlay'), ovContent = $('ovContent'), stageEl = $('sleeveStage');
+const ovRecord = $('ovRecord'), ovCover = $('ovCover'), hintEl = $('hint');
+const S = Math.min((INNER_W - 48) / 2.2, (INNER_H - 48) * 0.55);
+const FLY = INNER_H - 48;
+const peekX = S * 0.10, outX = S * 1.08;
+const sleeve = { album: null, x: new Anim(peekX), y: new Anim(0), appear: new Anim(0, 0.002), isOut: false, sent: false };
+stageEl.style.width = S * 2.1 + 'px'; stageEl.style.height = S + 'px';
+$('tracks').style.width = S * 2.1 + 'px';
+ovCover.style.boxShadow = '0 10px 24px rgba(0,0,0,0.55)';
+
+function select(album) {
+  deck.selectedId = album.id;
+  sleeve.album = album; sleeve.isOut = false; sleeve.sent = false;
+  sleeve.x.snap(peekX); sleeve.y.snap(0); sleeve.appear.snap(0); sleeve.appear.spring(1, 0.75, 300);
+  drawCover(ovCover, album, S, pxInner());
+  $('trMeta').textContent = `${album.artist} · ${album.title}` + (album.year ? ` · ${album.year}` : '');
+  const list = $('trList'); list.textContent = '';
+  album.tracks.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="no">A${i + 1}</span><span class="ti"></span><span class="du">${fmt(t.durationMs)}</span>`;
+    li.querySelector('.ti').textContent = t.title;
+    list.appendChild(li);
+  });
+  overlay.hidden = false;
+  paintSpines();
+}
+function dismiss() { deck.selectedId = null; sleeve.album = null; overlay.hidden = true; paintSpines(); }
+overlay.addEventListener('click', e => { if (!stageEl.contains(e.target)) dismiss(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden) dismiss(); });
+
+let sDrag = null;
+stageEl.addEventListener('pointerdown', e => {
+  if (sleeve.sent) return;
+  const p = localPoint($('inner'), e, INNER_W);
+  sDrag = { start: p, last: p, started: false, axis: null, samples: [{ ...p, t: e.timeStamp }] };
+  stageEl.setPointerCapture(e.pointerId);
+});
+stageEl.addEventListener('pointermove', e => {
+  if (!sDrag) return;
+  const p = localPoint($('inner'), e, INNER_W);
+  sDrag.samples.push({ ...p, t: e.timeStamp });
+  if (!sDrag.started) {
+    if (dist(p, sDrag.start) < SLOP) return;
+    sDrag.started = true;
+    const dx = p.x - sDrag.start.x, dy = p.y - sDrag.start.y;
+    sDrag.axis = sleeve.isOut && Math.abs(dy) > Math.abs(dx) ? 'v' : 'h';
+  }
+  const dx = p.x - sDrag.last.x, dy = p.y - sDrag.last.y; sDrag.last = p;
+  if (sDrag.axis === 'h') sleeve.x.snap(clamp(sleeve.x.v + dx, peekX, outX));
+  else sleeve.y.snap(Math.min(sleeve.y.v + dy, S * 0.1));
+});
+function endSleeveDrag(cancel) {
+  const d = sDrag; sDrag = null;
+  if (!d || !d.started) return;
+  const v = velocityOf(d.samples);
+  if (cancel) { sleeve.x.spring(sleeve.isOut ? outX : peekX); sleeve.y.spring(0); return; }
+  if (d.axis === 'h') {
+    sleeve.isOut = sleeve.x.v > outX * 0.5 || v.x > 1200 / DENSITY;
+    sleeve.x.spring(sleeve.isOut ? outX : peekX, 0.7);
+  } else if (sleeve.y.v < -S * 0.3 || v.y < -1500 / DENSITY) {
+    sleeve.sent = true;
+    const album = sleeve.album;
+    sleeve.y.tween(-(FLY + S * 2), 380).then(ok => { if (ok) { sendToFront(album); dismiss(); } });
+  } else {
+    sleeve.y.spring(0, 0.6);
+  }
+}
+stageEl.addEventListener('pointerup', () => endSleeveDrag(false));
+stageEl.addEventListener('pointercancel', () => endSleeveDrag(true));
+
+function renderSleeve() {
+  if (!sleeve.album) return;
+  const a = sleeve.appear.v;
+  overlay.style.background = `rgba(0,0,0,${0.72 * clamp(a, 0, 1)})`;
+  ovContent.style.opacity = clamp(a, 0, 1);
+  ovContent.style.transform = `translateY(${(1 - a) * (INNER_H - 48) * 0.3}px) scale(${0.85 + 0.15 * a})`;
+  const size = S * 0.96, ps = pxInner();
+  if (ovRecord.width !== Math.round((size + 8) * ps)) { ovRecord.style.width = ovRecord.style.height = size + 8 + 'px'; ovRecord.width = ovRecord.height = Math.round((size + 8) * ps); }
+  const c = ovRecord.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, ovRecord.width, ovRecord.height); c.setTransform(ps, 0, 0, ps, 0, 0);
+  drawVinyl(c, sleeve.album, size / 2, size / 2, size / 2, (sleeve.x.v - peekX) / S * 120, true, ps);
+  ovRecord.style.transform = `translate(${S * 0.02 + sleeve.x.v}px, ${S * 0.02 + sleeve.y.v}px)`;
+  hintEl.textContent = sleeve.sent ? 'Unterwegs nach vorne …'
+    : sleeve.isOut ? '↑  Nach oben wischen, um die Platte nach vorne zu schicken'
+    : 'Platte nach rechts aus der Hülle ziehen  →';
+}
+
+// ---------- Innendisplay: Statuskarte ----------
+$('liftBtn').addEventListener('click', liftNeedle);
+let statusSig = '';
+function renderStatus(track) {
+  const shown = deck.pending || deck.platter;
+  let t1 = '', t2 = '';
+  if (deck.pending) { t1 = `„${deck.pending.title}“ liegt vorne bereit`; t2 = 'Klapp das Fold zu und leg die Platte auf den Plattenteller.'; }
+  else if (track && deck.platter) { t1 = `Läuft: ${track.title}`; t2 = `${deck.platter.artist} · ${deck.platter.title}`; }
+  else if (deck.platter) { t1 = `„${deck.platter.title}“ liegt auf dem Plattenteller`; t2 = 'Zuklappen und die Nadel auflegen, um abzuspielen.'; }
+  const showLift = !!track && !deck.pending;
+  const sig = [shown && shown.id, t1, t2, showLift, pxInner()].join('|');
+  if (sig === statusSig) return; statusSig = sig;
+  $('status').classList.toggle('off', !shown);
+  $('st1').textContent = t1; $('st2').textContent = t2; $('liftBtn').hidden = !showLift;
+  if (shown) { const c = setupCanvas($('statusRec'), 48, 48, pxInner()); drawVinyl(c, shown, 24, 24, 24, 0, true, pxInner()); }
+}
+
+// ---------- Außendisplay: Plattenspieler (wie PlayerScreen) ----------
+const COVER_W = 400, COVER_H = 900;
+const coverEl = $('cover'), deckCv = $('deckCanvas'), topCv = $('topCanvas');
+const portrait = COVER_H >= COVER_W * 1.3;
+const deckW = portrait ? Math.min(COVER_W, COVER_H * 0.62 / 0.96) : Math.min(COVER_W * 0.64, COVER_H / 0.96);
+const g = new Geometry(deckW);
+const deckOrigin = portrait ? { x: (COVER_W - deckW) / 2, y: 0 } : { x: 0, y: (COVER_H - g.h) / 2 };
+const platterOnScreen = { x: deckOrigin.x + g.pc.x, y: deckOrigin.y + g.pc.y };
+const home = portrait ? { x: COVER_W / 2, y: COVER_H - g.rr * 0.75 } : { x: COVER_W - g.rr * 0.6, y: COVER_H - g.rr * 0.7 };
+$('info').style.top = deckOrigin.y + g.h + 'px';
+
+const arm = { v: g.rest, vel: 0, drag: null, hold: null };
+const spin = { rot: 0, speed: 0 };
+const recOff = { x: new Anim(0), y: new Anim(0) };
+const pend = { id: null, x: new Anim(home.x), y: new Anim(home.y) };
+let cDrag = null;
+
+coverEl.addEventListener('pointerdown', e => {
+  const p = localPoint(coverEl, e, COVER_W);
+  const d = { x: p.x - deckOrigin.x, y: p.y - deckOrigin.y };
+  let target = null;
+  if (deck.pending && dist(p, { x: pend.x.v, y: pend.y.v }) < g.rr) target = 'pending';
+  else if (g.distToArm(d, arm.v) < g.w * 0.07) target = 'arm';
+  else if (deck.platter && !deck.needleDown && arm.v < g.rest + 2 && dist(d, g.pc) < g.rr) target = 'record';
+  if (!target) return;
+  cDrag = { target, start: p, last: p, started: false };
+  coverEl.setPointerCapture(e.pointerId);
+});
+coverEl.addEventListener('pointermove', e => {
+  if (!cDrag) return;
+  const p = localPoint(coverEl, e, COVER_W);
+  if (!cDrag.started) {
+    if (dist(p, cDrag.start) < SLOP) return;
+    cDrag.started = true;
+    if (cDrag.target === 'arm') {
+      const s = { x: cDrag.start.x - deckOrigin.x, y: cDrag.start.y - deckOrigin.y };
+      cDrag.grab = arm.v - g.angleTowards(s);
+      if (deck.needleDown) liftNeedle();
+      arm.drag = arm.v;
+    }
+  }
+  const dx = p.x - cDrag.last.x, dy = p.y - cDrag.last.y; cDrag.last = p;
+  if (cDrag.target === 'arm') arm.drag = g.clampA(g.angleTowards({ x: p.x - deckOrigin.x, y: p.y - deckOrigin.y }) + cDrag.grab);
+  else if (cDrag.target === 'record') { recOff.x.snap(recOff.x.v + dx); recOff.y.snap(recOff.y.v + dy); }
+  else if (cDrag.target === 'pending') { pend.x.snap(pend.x.v + dx); pend.y.snap(pend.y.v + dy); }
+});
+function movePendingTo(t, z, k) { return Promise.all([pend.x.spring(t.x, z, k), pend.y.spring(t.y, z, k)]).then(r => r.every(Boolean)); }
+function endCoverDrag(cancel) {
+  const d = cDrag; cDrag = null; if (!d) return;
+  if (d.target === 'pending') {
+    if (!d.started) { if (!cancel) movePendingTo(platterOnScreen, 0.8, 200).then(ok => { if (ok) placePending(); }); return; }
+    if (dist({ x: pend.x.v, y: pend.y.v }, platterOnScreen) < g.pr * 0.75) movePendingTo(platterOnScreen, 0.8).then(ok => { if (ok) placePending(); });
+    else movePendingTo(home, 0.65);
+    return;
+  }
+  if (!d.started) return;
+  if (d.target === 'arm') {
+    const a = cancel ? g.rest : arm.drag;
+    arm.drag = null;
+    if (deck.platter && g.over(a)) { arm.hold = a; dropNeedle(g.progressForAngle(a)); } else arm.hold = null;
+  } else if (d.target === 'record') {
+    if (Math.hypot(recOff.x.v, recOff.y.v) > g.rr * 0.8) { removeFromPlatter(); recOff.x.snap(0); recOff.y.snap(0); }
+    else { recOff.x.spring(0, 0.7); recOff.y.spring(0, 0.7); }
+  }
+}
+coverEl.addEventListener('pointerup', () => endCoverDrag(false));
+coverEl.addEventListener('pointercancel', () => endCoverDrag(true));
+
+function updateCover(dt) {
+  if (deck.needleDown) arm.hold = null;
+  const np = needleProgress();
+  const target = arm.drag ?? arm.hold ?? (np != null ? g.angleForProgress(np) : g.rest);
+  if (arm.drag != null) { arm.v = arm.drag; arm.vel = 0; }
+  else {
+    let rem = dt; const k = 200, w = Math.sqrt(k);
+    while (rem > 0) { const h = Math.min(rem, 1 / 240); arm.vel += (-k * (arm.v - target) - 2 * w * arm.vel) * h; arm.v += arm.vel * h; rem -= h; }
+  }
+  const offRest = (arm.drag ?? arm.hold ?? (deck.needleDown ? g.outerA : g.rest)) > g.rest + 2;
+  const spinning = !!deck.platter && (deck.needleDown || offRest);
+  const tgt = spinning ? 200 : 0, acc = spinning ? 260 : 140;
+  spin.speed = spin.speed < tgt ? Math.min(tgt, spin.speed + acc * dt) : Math.max(tgt, spin.speed - acc * dt);
+  spin.rot = (spin.rot + spin.speed * dt) % 360;
+  spin.motor = spinning || spin.speed > 0;
+
+  if (deck.pending && deck.pending.id !== pend.id) {
+    pend.id = deck.pending.id;
+    pend.x.snap(home.x); pend.y.snap(home.y - g.rr * 3);
+    pend.y.spring(home.y, 0.65, 200);
+  }
+  if (!deck.pending) pend.id = null;
+}
+function renderCover() {
+  const ps = pxCover();
+  let c = deckCv.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, deckCv.width, deckCv.height);
+  c.setTransform(ps, 0, 0, ps, ps * deckOrigin.x, ps * deckOrigin.y);
+  drawPlinth(c, g, spin.motor);
+  drawPlatter(c, g, spin.rot);
+  if (deck.platter) {
+    const moved = recOff.x.v !== 0 || recOff.y.v !== 0;
+    drawVinyl(c, deck.platter, g.pc.x + recOff.x.v, g.pc.y + recOff.y.v, g.rr, spin.rot, moved, ps);
+  }
+  drawTonearm(c, g, arm.v, !deck.needleDown || arm.drag != null);
+
+  c = topCv.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, topCv.width, topCv.height);
+  if (deck.pending) {
+    c.setTransform(ps, 0, 0, ps, 0, 0);
+    const pos = { x: pend.x.v, y: pend.y.v };
+    const lift = 1 + 0.04 * clamp(dist(pos, home) / g.rr, 0, 1);
+    c.translate(pos.x, pos.y); c.scale(lift, lift);
+    drawVinyl(c, deck.pending, 0, 0, g.rr, 0, true, ps);
+  }
+}
+let infoSig = '';
+function renderInfo(track) {
+  const p = deck.platter, q = deck.pending;
+  let h, d;
+  if (p && deck.needleDown && track) { h = `A${player.i + 1}  ${track.title}`; d = `${p.artist} · ${p.title}   ${fmt(player.posMs())} / ${fmt(track.durationMs)}`; }
+  else if (q && !p) { h = `„${q.title}“ ist da`; d = 'Zieh die Platte auf den Plattenteller.'; }
+  else if (q) { h = `„${q.title}“ wartet`; d = `Zieh sie auf den Teller, um „${p.title}“ zu tauschen.`; }
+  else if (p) { h = p.title; d = 'Schwenk den Tonarm über die Platte und lass ihn los. Wo die Nadel aufsetzt, bestimmt den Titel.'; }
+  else { h = 'Keine Platte aufgelegt'; d = 'Klapp das Fold auf und hol dir eine Platte aus dem Schrank.'; }
+  if (deck.error) d += ` ${deck.error}`;
+  const sig = h + '|' + d; if (sig === infoSig) return; infoSig = sig;
+  $('infoH').textContent = h; $('infoD').textContent = d;
+}
+
+// ---------- Seite: Zustand, Ansicht, Größe ----------
+function fmt(ms) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+let stateSig = '';
+function renderState(track) {
+  const vals = [
+    deck.pending ? deck.pending.title : '–',
+    deck.platter ? `${deck.platter.title} (${deck.platter.artist})` : '–',
+    deck.needleDown ? (player.playing ? 'unten, spielt' : 'unten, lädt …') : 'oben',
+    track ? `A${player.i + 1} ${track.title} · ${fmt(player.posMs())}` : '–',
+    `${(spin.speed / 6).toFixed(spin.speed > 0 && spin.speed < 200 ? 1 : 0).replace('.', ',')} U/min`.replace('33 U/min', '33⅓ U/min'),
+  ];
+  const sig = vals.join('|'); if (sig === stateSig) return; stateSig = sig;
+  ['sPending', 'sPlatter', 'sNeedle', 'sTrack', 'sRpm'].forEach((id, i) => { $(id).textContent = vals[i]; });
+}
+
+const devInner = $('devInner'), devCover = $('devCover'), stage = $('stage');
+let view = window.innerWidth >= 900 ? 'both' : 'inner';
+function setView(v, animate) {
+  const apply = () => {
+    view = v;
+    devInner.hidden = v === 'cover'; devCover.hidden = v === 'inner';
+    $('vBoth').setAttribute('aria-pressed', v === 'both'); $('vInner').setAttribute('aria-pressed', v === 'inner'); $('vCover').setAttribute('aria-pressed', v === 'cover');
+    layout();
+  };
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const from = view === 'inner' ? devInner : view === 'cover' ? devCover : null;
+  if (!animate || reduce || !from || v === 'both' || view === 'both' || v === view) { apply(); return; }
+  const f = from.querySelector('.frame'); f.classList.add('folding');
+  setTimeout(() => {
+    f.classList.remove('folding'); apply();
+    const t = (v === 'inner' ? devInner : devCover).querySelector('.frame');
+    t.style.transition = 'none'; t.classList.add('folding'); void t.offsetWidth; t.style.transition = ''; t.classList.remove('folding');
+  }, 220);
+}
+$('vBoth').addEventListener('click', () => setView('both'));
+$('vInner').addEventListener('click', () => setView('inner', true));
+$('vCover').addEventListener('click', () => setView('cover', true));
+$('reset').addEventListener('click', () => {
+  removeFromPlatter(); deck.pending = null; deck.error = null; dismiss();
+  arm.drag = arm.hold = null; recOff.x.snap(0); recOff.y.snap(0);
+});
+
+function layout() {
+  const availW = stage.clientWidth || window.innerWidth - 32;
+  const top = stage.getBoundingClientRect().top + window.scrollY;
+  const availH = Math.max(420, window.innerHeight - Math.min(top, 140) - 60);
+  const bezel = 20;
+  if (view === 'both') {
+    const s = Math.min((availW - 28) / (INNER_W + COVER_W + 2 * bezel), availH / (COVER_H + bezel), 1);
+    scale.inner = scale.cover = s;
+  } else if (view === 'inner') {
+    scale.inner = Math.min(availW / (INNER_W + bezel), availH / (INNER_H + bezel), 1.1);
+  } else {
+    scale.cover = Math.min(availW / (COVER_W + bezel), availH / (COVER_H + bezel), 1.1);
+  }
+  devInner.style.setProperty('--s', scale.inner); devCover.style.setProperty('--s', scale.cover);
+  setupCanvas(deckCv, COVER_W, COVER_H, pxCover());
+  setupCanvas(topCv, COVER_W, COVER_H, pxCover());
+  if (vinylCache.size > 60) vinylCache.clear();
+  paintSpines(true);
+  if (sleeve.album) drawCover(ovCover, sleeve.album, S, pxInner());
+  statusSig = '';
+}
+window.addEventListener('resize', layout);
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  anims.forEach(a => a.step(dt));
+  updateCover(dt);
+  const rec = deck.platter;
+  const track = rec && deck.needleDown && player.albumId === rec.id ? rec.tracks[player.i] : null;
+  if (!devCover.hidden) { renderCover(); renderInfo(track); }
+  if (!devInner.hidden) { renderSleeve(); renderStatus(track); paintSpines(false); }
+  renderState(track);
+  requestAnimationFrame(frame);
+}
+
+$('libMeta').textContent = `${ALBUMS.length} Platten · Quelle: Demo`;
+buildShelves();
+setView(view);
+requestAnimationFrame(frame);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { vinylCache.clear(); layout(); });
+})();
+</script>
